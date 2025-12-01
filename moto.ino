@@ -14,6 +14,12 @@ volatile int pomiary[4]      = {0, 0, 0, 0};  // czasy kolejnych 4 impulsow (ms)
 const unsigned long okresWysylania = 100;
 unsigned long czasOstatniegoWyslania = 0;
 
+const int poziomyPWM[3] = {80, 150, 220};  // możesz zmienić wg uznania
+const unsigned long czasTrwaniaPoziomu = 5000; // ms, czas jednego poziomu
+
+int aktualnyPoziom = 0;
+unsigned long czasStartPoziomu = 0;
+
 void obslugaPWMzTerminala() {
   if (Serial.available() > 0) {
     int nowaWartosc = Serial.parseInt();
