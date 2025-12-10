@@ -5,6 +5,7 @@ volatile unsigned long pomiar = 0;
 volatile int numer           = 0;
 volatile int pomiary[4]      = {0, 0, 0, 0};
 unsigned long czasBrakuImpulsu = 0;
+float dTerm;
 
 // Serial Plotter
 const unsigned long okresWysylania = 50;
