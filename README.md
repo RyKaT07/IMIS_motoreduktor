@@ -82,7 +82,63 @@ W tym zadaniu komunikacja została rozbudowana o kinematykę:
 Dane wyświetlane są w kolumnach dla obu silników jednocześnie, co pozwala ocenić synchronizację:
 - Format: `0 <Zadana_L> <Aktualna_L> <Zadana_P> <Aktualna_P> <PWM_L> <PWM_P>`.
 
+# Laboratorium 5 – Sterowanie robotem z synchronizacją napędów
 
-Gemini może popełniać błędy, także co do ludzi, dlatego dokładnie sprawdzaj odpowiedzi. Twoja
+Celem ćwiczenia jest implementacja zaawansowanego sterowania, w którym dwa niezależne silniki są synchronizowane programowo. Pozwala to na jazdę idealnie prosto oraz precyzyjne pokonywanie łuków mimo różnic fizycznych w silnikach.
+
+## Wymagania i instrukcja obsługi kodu `5_synchronizacja.ino`
+
+Kod realizuje zadania opisane w sekcji 5.1 instrukcji laboratoryjnej. Poniżej opisano sposób weryfikacji każdego punktu.
+
+### 1. PID jako funkcja i jednostki m/s (Zadanie 1)
+* **Zmiany w kodzie:** Główna pętla `loop()` została uproszczona. Regulator PID został wydzielony do funkcji `liczPID`. Prędkość jest przeliczana z impulsów enkodera na **metry na sekundę [m/s]**.
+* **Konfiguracja:** Przed uruchomieniem zmierz średnicę kół robota i wpisz ją w stałej `SREDNICA_KOLA` na początku kodu.
+* **Weryfikacja:**
+    1.  Wgraj kod.
+    2.  Otwórz Serial Plotter.
+    3.  Wyślij komendę `v0.2` (ustaw prędkość 0.2 m/s).
+    4.  Sprawdź, czy wykresy prędkości aktualnej (`vAktL`, `vAktP`) oscylują wokół wartości 0.2.
+
+### 2. Regulator Synchronizacji RS (Zadanie 2)
+* **Działanie:** Zaimplementowano strukturę sterowania (zgodnie z Rys. 28/29), gdzie dodatkowy regulator `regRS` mierzy różnicę prędkości kół i wprowadza korektę krzyżową (dodaje sterowanie do jednego silnika, odejmuje od drugiego).
+* **Weryfikacja:**
+    1.  Ustaw jazdę prosto: `v0.2`, `r1000`.
+    2.  Wyłącz synchronizację komendą `S0` (Kp RS = 0) – zaobserwuj czy robot znosi na bok.
+    3.  Włącz synchronizację komendą `S200` (Kp RS = 200) – robot powinien jechać prosto, a różnica prędkości na wykresie powinna dążyć do zera.
+
+### 3. Jazda po łuku (Zadanie 3)
+* **Działanie:** Funkcja `aktualizujZadanePredkosci` wykorzystuje model kinematyczny robota różnicowego. Na podstawie zadanego promienia `r` wylicza unikalne prędkości dla koła lewego i prawego. Regulator RS pilnuje, aby ta różnica prędkości była utrzymana.
+* **Weryfikacja:**
+    1.  Wyślij komendę `v0.2` oraz `r0.5` (łuk o promieniu 0.5m).
+    2.  Na Serial Plotterze powinieneś widzieć dwie różne wartości zadane (np. 0.18 m/s i 0.22 m/s) oraz podążające za nimi wartości aktualne.
+
+### 4. Sekwencja: Okrąg ze zmienną prędkością (Zadanie 4)
+* **Scenariusz:** Robot jeździ po okręgu o stałym promieniu. Pierwszą połowę czasu jedzie szybko, drugą połowę wolno.
+* **Uruchomienie:** Wpisz w terminalu komendę `k1`.
+* **Cel:** Sprawdź, czy mimo zmiany prędkości (z 0.3 m/s na 0.15 m/s) robot utrzymuje ten sam promień skrętu (nie zacieśnia ani nie poszerza koła).
+
+### 5. Sekwencja: Ósemka (Zadanie 5)
+* **Scenariusz:** Robot wykonuje dwie pętle o różnych średnicach i przeciwnych zwrotach.
+* **Uruchomienie:** Wpisz w terminalu komendę `k2`.
+* **Przebieg:**
+    * Etap 1: Lewy łuk, promień 0.4m.
+    * Etap 2: Prawy łuk, promień 0.6m (większa pętla).
+
+---
+
+## Lista komend UART (Serial Monitor / Plotter)
+
+| Komenda | Przykład | Opis |
+| :--- | :--- | :--- |
+| `v` | `v0.25` | Zadaj prędkość liniową [m/s]. |
+| `r` | `r0.5` | Zadaj promień skrętu [m]. `r1000` = prosto. Ujemny = w prawo. |
+| `S` | `S300` | Ustaw wzmocnienie Kp regulatora synchronizacji (RS). |
+| `k` | `k1` | Uruchom sekwencję (1=Koło, 2=Ósemka). |
+| `p` | `p400` | Zmień Kp silników (dla obu naraz). |
+| `i` | `i150` | Zmień Ki silników. |
+| `d` | `d20` | Zmień Kd silników. |
+
+**Format danych na wykresie (Serial Plotter):**
+`0  vZadanaL  vAktualnaL  vZadanaP  vAktualnaP`
 
 Jeśli coś nie działało i udało Ci się to naprawić, zrób pull request z poprawkami.
