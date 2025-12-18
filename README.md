@@ -82,63 +82,90 @@ W tym zadaniu komunikacja została rozbudowana o kinematykę:
 Dane wyświetlane są w kolumnach dla obu silników jednocześnie, co pozwala ocenić synchronizację:
 - Format: `0 <Zadana_L> <Aktualna_L> <Zadana_P> <Aktualna_P> <PWM_L> <PWM_P>`.
 
-# Laboratorium 5 – Sterowanie robotem z synchronizacją napędów
+## LAB 5 – szybka instrukcja uruchomienia (Twoja wersja kodu)
 
-Celem ćwiczenia jest implementacja zaawansowanego sterowania, w którym dwa niezależne silniki są synchronizowane programowo. Pozwala to na jazdę idealnie prosto oraz precyzyjne pokonywanie łuków mimo różnic fizycznych w silnikach.
+### Wybór trybu startu: USB/Serial vs „RESET-START”
+W pliku na górze masz:
 
-## Wymagania i instrukcja obsługi kodu `5_synchronizacja.ino`
+```cpp
+#define START_FROM_SETUP 0
+const unsigned long START_DELAY_MS = 600;
+```
 
-Kod realizuje zadania opisane w sekcji 5.1 instrukcji laboratoryjnej. Poniżej opisano sposób weryfikacji każdego punktu.
+- `START_FROM_SETUP = 0` – robot **czeka na komendy z Serial** (`v...`, `r...`) i możesz sterować na bieżąco.
+- `START_FROM_SETUP = 1` – robot **sam ustawia startowe `cmdV_ms/cmdR_m` w `setup()`** po resecie (po `START_DELAY_MS`) i rusza bez USB.
 
-### 1. PID jako funkcja i jednostki m/s (Zadanie 1)
-* **Zmiany w kodzie:** Główna pętla `loop()` została uproszczona. Regulator PID został wydzielony do funkcji `liczPID`. Prędkość jest przeliczana z impulsów enkodera na **metry na sekundę [m/s]**.
-* **Konfiguracja:** Przed uruchomieniem zmierz średnicę kół robota i wpisz ją w stałej `SREDNICA_KOLA` na początku kodu.
-* **Weryfikacja:**
-    1.  Wgraj kod.
-    2.  Otwórz Serial Plotter.
-    3.  Wyślij komendę `v0.2` (ustaw prędkość 0.2 m/s).
-    4.  Sprawdź, czy wykresy prędkości aktualnej (`vAktL`, `vAktP`) oscylują wokół wartości 0.2.
+Startowe wartości dla punktów 1–3:
 
-### 2. Regulator Synchronizacji RS (Zadanie 2)
-* **Działanie:** Zaimplementowano strukturę sterowania (zgodnie z Rys. 28/29), gdzie dodatkowy regulator `regRS` mierzy różnicę prędkości kół i wprowadza korektę krzyżową (dodaje sterowanie do jednego silnika, odejmuje od drugiego).
-* **Weryfikacja:**
-    1.  Ustaw jazdę prosto: `v0.2`, `r1000`.
-    2.  Wyłącz synchronizację komendą `S0` (Kp RS = 0) – zaobserwuj czy robot znosi na bok.
-    3.  Włącz synchronizację komendą `S200` (Kp RS = 200) – robot powinien jechać prosto, a różnica prędkości na wykresie powinna dążyć do zera.
-
-### 3. Jazda po łuku (Zadanie 3)
-* **Działanie:** Funkcja `aktualizujZadanePredkosci` wykorzystuje model kinematyczny robota różnicowego. Na podstawie zadanego promienia `r` wylicza unikalne prędkości dla koła lewego i prawego. Regulator RS pilnuje, aby ta różnica prędkości była utrzymana.
-* **Weryfikacja:**
-    1.  Wyślij komendę `v0.2` oraz `r0.5` (łuk o promieniu 0.5m).
-    2.  Na Serial Plotterze powinieneś widzieć dwie różne wartości zadane (np. 0.18 m/s i 0.22 m/s) oraz podążające za nimi wartości aktualne.
-
-### 4. Sekwencja: Okrąg ze zmienną prędkością (Zadanie 4)
-* **Scenariusz:** Robot jeździ po okręgu o stałym promieniu. Pierwszą połowę czasu jedzie szybko, drugą połowę wolno.
-* **Uruchomienie:** Wpisz w terminalu komendę `k1`.
-* **Cel:** Sprawdź, czy mimo zmiany prędkości (z 0.3 m/s na 0.15 m/s) robot utrzymuje ten sam promień skrętu (nie zacieśnia ani nie poszerza koła).
-
-### 5. Sekwencja: Ósemka (Zadanie 5)
-* **Scenariusz:** Robot wykonuje dwie pętle o różnych średnicach i przeciwnych zwrotach.
-* **Uruchomienie:** Wpisz w terminalu komendę `k2`.
-* **Przebieg:**
-    * Etap 1: Lewy łuk, promień 0.4m.
-    * Etap 2: Prawy łuk, promień 0.6m (większa pętla).
+```cpp
+float setup_v_ms = 0.20;
+float setup_r_m  = 1000.0;  // „prosto”
+```
 
 ---
 
-## Lista komend UART (Serial Monitor / Plotter)
+### Punkty 4–5: `cmdV_ms` / `cmdR_m` są nadpisywane przez automat
+W punktach autonomicznych **nie sterujesz ruchem przez `v/r` z terminala**, bo funkcja automatu w `aktualizujPID()` ustawia `cmdV_ms/cmdR_m` sama:
+
+```cpp
+lab5_updateAutonomous();
+```
+
+Co dokładnie jest nadpisywane:
+
+- **Punkt 4 (okrąg pół-szybk)**: automat w czasie **nadpisuje `cmdV_ms`** (`fast` → `slow`) i trzyma `cmdR_m = setup_p4_radius_m`.
+- **Punkt 5 (ósemka różne R)**: automat w czasie **nadpisuje `cmdR_m`** (`+R1` → `-R2`) i trzyma `cmdV_ms = setup_p5_v_ms`.
+
+Parametry trajektorii ustawiasz na górze pliku.
+
+**Punkt 4**
+
+```cpp
+float setup_p4_radius_m   = 0.80;
+float setup_p4_v_fast_ms  = 0.20;
+float setup_p4_v_slow_ms  = 0.10;
+```
+
+**Punkt 5**
+
+```cpp
+float setup_p5_v_ms = 0.18;
+float setup_p5_r1_m = 0.60;
+float setup_p5_r2_m = 1.00;
+```
+
+---
+
+### Log do Serial Plottera: prędkość zadana robota vs aktualna
+W logu masz teraz:
+
+- `vZadRobot` = **`cmdV_ms`** (zadana globalnie – z terminala albo z automatu),
+- `vAktRobot` = **średnia z prędkości kół**:
+
+```cpp
+float vAktRobot_ms = 0.5f * (vAkt_L_ms + vAkt_P_ms);
+Serial.print("vZadRobot:"); Serial.print(cmdV_ms);       Serial.print(",");
+Serial.print("vAktRobot:"); Serial.print(vAktRobot_ms);  Serial.print(",");
+```
+
+Dodatkowo logujesz setpointy i pomiary kół (`vZadL/vAktL`, `vZadP/vAktP`) oraz PWM (`PWM_L/PWM_P`) – dzięki temu widać zarówno „cel ruchu robota”, jak i pracę regulatorów.
+
+
+## Lista komend UART (Serial Monitor)
 
 | Komenda | Przykład | Opis |
 | :--- | :--- | :--- |
-| `v` | `v0.25` | Zadaj prędkość liniową [m/s]. |
-| `r` | `r0.5` | Zadaj promień skrętu [m]. `r1000` = prosto. Ujemny = w prawo. |
-| `S` | `S300` | Ustaw wzmocnienie Kp regulatora synchronizacji (RS). |
-| `k` | `k1` | Uruchom sekwencję (1=Koło, 2=Ósemka). |
-| `p` | `p400` | Zmień Kp silników (dla obu naraz). |
-| `i` | `i150` | Zmień Ki silników. |
-| `d` | `d20` | Zmień Kd silników. |
+| `v` | `v0.25` | Zadaj prędkość liniową `cmdV_ms` [m/s]. |
+| `r` | `r0.5` | Zadaj promień skrętu `cmdR_m` [m]. Duża wartość (np. `r1000`) = prawie prosto. Znak promienia zgodny z konwencją kinematyki w kodzie. |
+| `p` | `p0.30` | Ustaw `Kp` regulatorów PID obu silników naraz. |
+| `i` | `i2.00` | Ustaw `Ki` regulatorów PID obu silników naraz. |
+| `d` | `d0.05` | Ustaw `Kd` regulatorów PID obu silników naraz. |
+| `R` | `R` | Przełącz regulator synchronizacji RS: **PI ↔ P** (`rs.useI`). |
+| `?` | `?` | Wypisz status: `cmdV`, `cmdR`, `vZadL/P`, `vAktL/P`. |
+
+---
 
 **Format danych na wykresie (Serial Plotter):**
-`0  vZadanaL  vAktualnaL  vZadanaP  vAktualnaP`
+`0 vZadRobot vAktualnaRobot vZadanaL  vAktualnaL  vZadanaP  vAktualnaP PWM_L PWM_P`
 
 Jeśli coś nie działało i udało Ci się to naprawić, zrób pull request z poprawkami.
